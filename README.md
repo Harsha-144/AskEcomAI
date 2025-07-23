@@ -20,7 +20,7 @@
 ## ⚙️ Setup Instructions
 
 ### 1. Clone the Repository
-git clone https://github.com/your-username/EcomQueryAI.git
+git clone https://github.com/Harsha-144/AskEcomAI.git
 cd EcomQueryAI
 
 
