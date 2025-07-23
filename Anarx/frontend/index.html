@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI E-commerce Agent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+
+    header {
+      background-color: #4c4b4b;
+      color: white;
+      padding: 20px;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    footer {
+      background-color: #f1f1f1;
+      color: #333;
+      padding: 15px;
+      font-size: 16px;
+      position: relative;
+      bottom: 0;
+      width: 100%;
+      margin-top: 50px;
+    }
+
+    h1 { color: #333; font-size: 32px; margin: 20px 0 10px; }
+    p { font-size: 16px; color: #555; }
+
+    input, button {
+      padding: 12px;
+      font-size: 16px;
+      margin: 10px 0;
+      width: 100%;
+      border-radius: 6px;
+    }
+
+    input { border: 1px solid #ccc; }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover { background-color: #0056b3; }
+
+    #question-list, #chart-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      max-width: 900px;
+      margin: 20px auto;
+    }
+
+    #question-list button,
+    #chart-buttons button {
+      background-color: #17a2b8;
+      color: white;
+      border: none;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    #question-list button:hover,
+    #chart-buttons button:hover {
+      background-color: #117a8b;
+    }
+
+    .input-wrapper {
+      max-width: 500px;
+      margin: 30px auto;
+    }
+
+    #response {
+      margin-top: 25px;
+      font-size: 18px;
+      color: #222;
+      white-space: pre-wrap;
+      min-height: 40px;
+    }
+
+    #chart-container {
+      max-width: 900px;
+      height: 400px;
+      margin: 30px auto;
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      header { font-size: 22px; }
+      #chart-buttons { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>AI E-commerce Agent</header>
+
+  <p>Select a predefined question or type your own below:</p>
+
+  <div id="question-list">
+    <button onclick="askPredefined('What is my total sales?')">Total Sales</button>
+    <button onclick="askPredefined('How many units were ordered in total?')">Units Ordered</button>
+    <button onclick="askPredefined('Which product had the highest total sales?')">Highest Sales Product</button>
+    <button onclick="askPredefined('Which product is most ordered?')">Most Ordered Product</button>
+
+    <button onclick="askPredefined('What is the total ad spend?')">Total Ad Spend</button>
+    <button onclick="askPredefined('What is the total ad sales?')">Total Ad Sales</button>
+    <button onclick="askPredefined('Which product had the highest ad sales?')">Highest Ad Sales</button>
+    <button onclick="askPredefined('Which product has highest CPC?')">Highest CPC</button>
+
+    <button onclick="askPredefined('Calculate the RoAS')">RoAS</button>
+    <button onclick="askPredefined('Which product had the most ad impressions?')">Top Impressions</button>
+    <button onclick="askPredefined('How many products are eligible?')">Eligible Products</button>
+    <button onclick="askPredefined('How many products are ineligible?')">Ineligible Products</button>
+  </div>
+
+  <div class="input-wrapper">
+    <input type="text" id="question" placeholder="Or ask your own question..." autocomplete="off" />
+    <button onclick="askQuestion()">Ask</button>
+  </div>
+
+  <div id="response"></div>
+
+  <hr>
+
+  <h3>Visualize Data from CSV</h3>
+  <div id="chart-buttons">
+    <button onclick="showChart('sales')">Top Total Sales</button>
+    <button onclick="showChart('units')">Top Units Ordered</button>
+    <button onclick="showChart('ads')">Ad Spend vs Sales</button>
+    <button onclick="showChart('clicks')">Top Clicks</button>
+  </div>
+
+  <div id="chart-container">
+    <canvas id="chart"></canvas>
+  </div>
+
+  <footer>
+    Developed by Harshavardhan Reddy
+  </footer>
+
+  <script>
+    async function askPredefined(question) {
+      document.getElementById('question').value = question;
+      await askQuestion();
+    }
+
+    async function askQuestion() {
+      const question = document.getElementById('question').value.trim();
+      const responseDiv = document.getElementById('response');
+
+      if (!question) {
+        responseDiv.innerText = "Please enter a question.";
+        return;
+      }
+
+      responseDiv.innerText = "Thinking...";
+
+      try {
+        const res = await fetch('http://127.0.0.1:8000/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question })
+        });
+
+        const data = await res.json();
+        data.answer ? typeResponse(data.answer) : responseDiv.innerText = "No answer returned.";
+      } catch {
+        responseDiv.innerText = "Error contacting server.";
+      }
+    }
+
+    function typeResponse(text) {
+      const responseDiv = document.getElementById("response");
+      responseDiv.innerText = "";
+      let i = 0;
+      const interval = setInterval(() => {
+        responseDiv.innerText += text[i++];
+        if (i >= text.length) clearInterval(interval);
+      }, 25);
+    }
+
+    let chartInstance = null;
+
+    function generateColors(count, alpha = 0.6) {
+      const baseColors = [
+        '255, 99, 132', '54, 162, 235', '255, 206, 86',
+        '75, 192, 192', '153, 102, 255', '255, 159, 64',
+        '0, 204, 102', '201, 203, 207', '102, 102, 255',
+        '255, 51, 153'
+      ];
+      const colors = [];
+      for (let i = 0; i < count; i++) {
+        const rgb = baseColors[i % baseColors.length];
+        colors.push(`rgba(${rgb}, ${alpha})`);
+      }
+      return colors;
+    }
+
+    async function showChart(type) {
+      const ctx = document.getElementById("chart").getContext('2d');
+      document.getElementById("chart-container").style.display = "block";
+      if (chartInstance) chartInstance.destroy();
+
+      const endpointMap = {
+        sales: "/chart/total_sales",
+        units: "/chart/units_ordered",
+        ads: "/chart/ad_spend_vs_sales",
+        clicks: "/chart/ad_clicks",
+        eligibility: "/chart/eligibility"
+      };
+
+      try {
+        const res = await fetch(`http://127.0.0.1:8000${endpointMap[type]}`);
+        const chartData = await res.json();
+        const labels = chartData.labels;
+        const datasets = [];
+
+        if (type === 'ads') {
+          datasets.push({
+            label: 'Ad Spend',
+            data: chartData.ad_spend,
+            backgroundColor: generateColors(chartData.ad_spend.length, 0.5)
+          });
+          datasets.push({
+            label: 'Ad Sales',
+            data: chartData.ad_sales,
+            backgroundColor: generateColors(chartData.ad_sales.length, 0.8)
+          });
+        } else {
+          datasets.push({
+            label: type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' '),
+            data: chartData.data,
+            backgroundColor: generateColors(chartData.data.length, 0.7)
+          });
+        }
+
+        chartInstance = new Chart(ctx, {
+          type: type === 'eligibility' ? 'pie' : 'bar',
+          data: { labels: labels, datasets: datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { font: { size: 14 } } }
+            },
+            scales: type !== 'eligibility' ? {
+              y: { beginAtZero: true }
+            } : {}
+          }
+        });
+      } catch {
+        alert("Failed to fetch chart data.");
+      }
+    }
+  </script>
+
+</body>
+</html>
+
+
